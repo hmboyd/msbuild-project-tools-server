@@ -85,7 +85,7 @@ namespace MSBuildProjectTools.LanguageServer
                     );
                     _parentProcess.Exited += (sender, args) =>
                     {
-                        Serilog.Log.Verbose("Parent process {ParentProcessId} has exited unexpectedly; terminating down language server process {ProcessId}.",
+                        Serilog.Log.Verbose("Parent process {ParentProcessId} has exited unexpectedly; terminating language server process {ProcessId}.",
                             _parentProcess.Id,
                             _currentProcess.Id
                         );
