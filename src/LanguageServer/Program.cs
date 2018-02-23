@@ -3,6 +3,7 @@ using OmniSharp.Extensions.LanguageServer;
 using Serilog;
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Threading;
 using System.Threading.Tasks;
@@ -21,6 +22,16 @@ namespace MSBuildProjectTools.LanguageServer
     /// </summary>
     static class Program
     {
+        /// <summary>
+        ///     The current process (used for auto-shutdown).
+        /// </summary>
+        static Process _currentProcess = Process.GetCurrentProcess();
+        
+        /// <summary>
+        ///     The parent process (we automatically shut down if it exits unexpectedly).
+        /// </summary>
+        static Process _parentProcess;
+
         /// <summary>
         ///     The main program entry-point.
         /// </summary>
@@ -63,6 +74,30 @@ namespace MSBuildProjectTools.LanguageServer
                 var server = container.Resolve<LSP.Server.LanguageServer>();
 
                 await server.Initialize();
+
+                if (server.Client.ProcessId.HasValue)
+                {
+                    // Last-chance cleanup; if our parent process (i.e. the language client) terminates without asking us to shut down, then exit anyway.
+                    Log.Verbose("Watching parent process {ParentProcessId} (will automatically shut down if it exits unexpectedly).", server.Client.ProcessId);
+
+                    _parentProcess = Process.GetProcessById(
+                        (int)server.Client.ProcessId.Value
+                    );
+                    _parentProcess.Exited += (sender, args) =>
+                    {
+                        Serilog.Log.Verbose("Parent process {ParentProcessId} has exited unexpectedly; terminating down language server process {ProcessId}.",
+                            _parentProcess.Id,
+                            _currentProcess.Id
+                        );
+                        Serilog.Log.CloseAndFlush();
+
+                        _currentProcess.Kill();
+                    };
+                    _parentProcess.EnableRaisingEvents = true;
+                }
+                else
+                    Log.Verbose("Cannot determine parent process Id.");
+
                 await server.WasShutDown;
             }
         }
