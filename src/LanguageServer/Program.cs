@@ -23,16 +23,6 @@ namespace MSBuildProjectTools.LanguageServer
     static class Program
     {
         /// <summary>
-        ///     The current process (used for auto-shutdown).
-        /// </summary>
-        static Process _currentProcess = Process.GetCurrentProcess();
-        
-        /// <summary>
-        ///     The parent process (we automatically shut down if it exits unexpectedly).
-        /// </summary>
-        static Process _parentProcess;
-
-        /// <summary>
         ///     The main program entry-point.
         /// </summary>
         static void Main()
@@ -77,38 +67,12 @@ namespace MSBuildProjectTools.LanguageServer
             {
                 var server = container.Resolve<LSP.Server.LanguageServer>();
 
-                Log.Verbose("Language server starting in process {ProcessId}.", _currentProcess.Id);
+                Log.Verbose("Language server starting in process {ProcessId}.", Process.GetCurrentProcess().Id);
 
                 await server.Initialize();
+                await server.WasShutDownOrParentProcessTerminated();
 
-                if (server.Client.ProcessId.HasValue)
-                {
-                    // Last-chance cleanup; if our parent process (i.e. the language client) terminates without asking us to shut down, then exit anyway.
-                    Log.Verbose("Parent process is {ParentProcessId}.", server.Client.ProcessId);
-
-                    _parentProcess = Process.GetProcessById(
-                        (int)server.Client.ProcessId.Value
-                    );
-                    _parentProcess.EnableRaisingEvents = true;
-                    _parentProcess.Exited += (sender, args) =>
-                    {
-                        Serilog.Log.Verbose("Parent process {ParentProcessId} has exited unexpectedly; terminating language server process {ProcessId}.",
-                            _parentProcess.Id,
-                            _currentProcess.Id
-                        );
-                        Serilog.Log.CloseAndFlush();
-
-                        _currentProcess.Kill();
-                    };
-
-                    Log.Verbose("Watching parent process {ParentProcessId} (will automatically shut down if it exits unexpectedly).", server.Client.ProcessId);
-                }
-                else
-                    Log.Verbose("Cannot determine parent process Id.");
-
-                await server.WasShutDown;
-
-                Log.Verbose("Server shutdown.");
+                Log.Information("Server shutdown.");
             }
         }
 
