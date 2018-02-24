@@ -58,6 +58,10 @@ namespace MSBuildProjectTools.LanguageServer
             {
                 Console.WriteLine(unexpectedError);
             }
+            finally
+            {
+                Log.CloseAndFlush();
+            }
         }
 
         /// <summary>
@@ -73,16 +77,19 @@ namespace MSBuildProjectTools.LanguageServer
             {
                 var server = container.Resolve<LSP.Server.LanguageServer>();
 
+                Log.Verbose("Language server starting in process {ProcessId}.", _currentProcess.Id);
+
                 await server.Initialize();
 
                 if (server.Client.ProcessId.HasValue)
                 {
                     // Last-chance cleanup; if our parent process (i.e. the language client) terminates without asking us to shut down, then exit anyway.
-                    Log.Verbose("Watching parent process {ParentProcessId} (will automatically shut down if it exits unexpectedly).", server.Client.ProcessId);
+                    Log.Verbose("Parent process is {ParentProcessId}.", server.Client.ProcessId);
 
                     _parentProcess = Process.GetProcessById(
                         (int)server.Client.ProcessId.Value
                     );
+                    _parentProcess.EnableRaisingEvents = true;
                     _parentProcess.Exited += (sender, args) =>
                     {
                         Serilog.Log.Verbose("Parent process {ParentProcessId} has exited unexpectedly; terminating down language server process {ProcessId}.",
@@ -93,12 +100,15 @@ namespace MSBuildProjectTools.LanguageServer
 
                         _currentProcess.Kill();
                     };
-                    _parentProcess.EnableRaisingEvents = true;
+
+                    Log.Verbose("Watching parent process {ParentProcessId} (will automatically shut down if it exits unexpectedly).", server.Client.ProcessId);
                 }
                 else
                     Log.Verbose("Cannot determine parent process Id.");
 
                 await server.WasShutDown;
+
+                Log.Verbose("Server shutdown.");
             }
         }
 

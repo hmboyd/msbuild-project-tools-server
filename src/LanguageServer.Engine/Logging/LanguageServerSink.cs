@@ -56,8 +56,6 @@ namespace MSBuildProjectTools.LanguageServer.Logging
             {
                 realLanguageServer.Shutdown += shutDownRequested =>
                 {
-                    Log.CloseAndFlush();
-
                     _hasServerShutDown = true;
                 };
             }
