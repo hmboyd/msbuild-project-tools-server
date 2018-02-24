@@ -5,6 +5,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
+using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 
@@ -62,12 +63,17 @@ namespace MSBuildProjectTools.LanguageServer
         /// </returns>
         static async Task AsyncMain()
         {
+            string serverVersion = typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+
             using (ActivityCorrelationManager.BeginActivityScope())
             using (IContainer container = BuildContainer())
             {
                 var server = container.Resolve<LSP.Server.LanguageServer>();
 
-                Log.Verbose("Language server starting in process {ProcessId}.", Process.GetCurrentProcess().Id);
+                Log.Verbose("Language server v{ServerVersion} starting in process {ProcessId}.",
+                    serverVersion ?? "???",
+                    Process.GetCurrentProcess().Id
+                );
 
                 await server.Initialize();
                 await server.WasShutDownOrParentProcessTerminated();
