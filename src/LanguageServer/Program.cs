@@ -78,8 +78,23 @@ namespace MSBuildProjectTools.LanguageServer
                 await server.Initialize();
                 await server.WasShutDownOrParentProcessTerminated();
 
-                Log.Information("Server shutdown.");
+                Log.Information("Server is shutting down...");
+
+                // AF: Temporary fix for tintoy/msbuild-project-tools-vscode#36
+                //
+                //     The server hangs while waiting for LSP's ProcessScheduler thread to terminate so, after a timeout has elapsed, we forcibly terminate this process.
+#pragma warning disable CS4014 // Fire-and-forget.
+                Task.Delay(TimeSpan.FromSeconds(5)).ContinueWith(_ =>
+                {
+                    Log.Warning("Server failed to shut down cleanly after 5 seconds; process will now be forcibly terminated.");
+                    Log.CloseAndFlush();
+
+                    Environment.Exit(1);
+                });
+#pragma warning restore CS4014
             }
+
+            Log.Information("Server has shut down.");
         }
 
         /// <summary>
